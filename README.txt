@@ -1,4 +1,4 @@
-Project 4: Smart Water Level Indicator
+Project: Smart Water Level Indicator
 
 Author: PURVA BHATI
 
@@ -85,5 +85,6 @@ Anode → 220Ω Resistor → D4
 Cathode → GND
 
 📷 Simulation Platform:
+
 
 Wokwi IoT Simulator
