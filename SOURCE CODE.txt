@@ -1,0 +1,136 @@
+// Include necessary libraries
+#include <LiquidCrystal_I2C.h> // For I2C LCD
+#include <Wire.h>             // Required for I2C communication
+
+// Define pin numbers
+const int trigPin = 9;  // Ultrasonic sensor Trig pin
+const int echoPin = 10; // Ultrasonic sensor Echo pin
+const int buzzerPin = 7; // Buzzer pin
+
+// Optional LED pins (uncomment and connect if using LEDs)
+const int lowWaterLedPin = 2;   // Red LED
+const int mediumWaterLedPin = 3; // Yellow LED
+const int highWaterLedPin = 4;  // Green LED
+
+// Define LCD parameters (adjust I2C address if needed, common ones are 0x27 or 0x3F)
+LiquidCrystal_I2C lcd(0x27, 16, 2); // SDA A4, SCL A5 on Arduino Uno
+
+// Define the maximum height of your water tank in centimeters.
+// IMPORTANT: You'll need to measure this accurately for your tank.
+// This is the distance from the sensor when the tank is EMPTY.
+const float MAX_WATER_HEIGHT_CM = 20.0; // Example: 20 cm (adjust this!)
+
+// Define water level thresholds for alerts (in percentage)
+const int LOW_WATER_THRESHOLD = 20;  // Alert if water level is below 20%
+const int HIGH_WATER_THRESHOLD = 90; // Alert if water level is above 90% (near full)
+const int MEDIUM_WATER_LOW_THRESHOLD = 21; // Define a lower bound for medium range
+const int MEDIUM_WATER_HIGH_THRESHOLD = 89; // Define an upper bound for medium range
+
+
+void setup() {
+  // Serial.begin(9600); // REMOVED: No longer needed for serial monitor
+
+  // Set sensor pins as input/output
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // Set buzzer pin as output
+  pinMode(buzzerPin, OUTPUT);
+
+  // Set LED pins as output
+  pinMode(lowWaterLedPin, OUTPUT);
+  pinMode(mediumWaterLedPin, OUTPUT);
+  pinMode(highWaterLedPin, OUTPUT);
+
+  // Initialize the LCD
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Water Level:");
+}
+
+void loop() {
+  // Clear the Trig pin by setting it LOW for 2 microseconds
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // Set the Trig pin HIGH for 10 microseconds to send a pulse
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Measure the duration of the pulse on the Echo pin
+  long duration = pulseIn(echoPin, HIGH);
+
+  // Calculate distance in centimeters
+  // Speed of sound in air is approximately 0.0343 cm/microsecond
+  // Distance = (Duration * Speed of Sound) / 2 (because it travels to and from)
+  float distanceCm = duration * 0.0343 / 2;
+
+  // Calculate water height: MAX_WATER_HEIGHT_CM - distance from sensor
+  // When the tank is full, distanceCm will be small.
+  // When the tank is empty, distanceCm will be close to MAX_WATER_HEIGHT_CM.
+  float waterHeightCm = MAX_WATER_HEIGHT_CM - distanceCm;
+
+  // Ensure waterHeightCm doesn't go below zero or above max height due to sensor inaccuracies
+  if (waterHeightCm < 0) {
+    waterHeightCm = 0;
+  }
+  if (waterHeightCm > MAX_WATER_HEIGHT_CM) {
+    waterHeightCm = MAX_WATER_HEIGHT_CM;
+  }
+
+  // Calculate water level percentage
+  int waterLevelPercent = (waterHeightCm / MAX_WATER_HEIGHT_CM) * 100;
+
+  // Display on LCD
+  lcd.setCursor(0, 1); // Set cursor to the second row
+  lcd.print("Level: ");
+  lcd.print(waterLevelPercent);
+  lcd.print("%   "); // Clear remaining characters if any
+
+  // REMOVED: Serial.print statements are gone
+  // Serial.print("Distance (cm): ");
+  // Serial.print(distanceCm);
+  // Serial.print(" | Water Height (cm): ");
+  // Serial.print(waterHeightCm);
+  // Serial.print(" | Water Level: ");
+  // Serial.print(waterLevelPercent);
+  // Serial.println("%");
+
+  // Alerting logic (Buzzer and/or LEDs)
+  digitalWrite(buzzerPin, LOW); // Turn off buzzer initially
+
+  // Control LED states
+  digitalWrite(lowWaterLedPin, LOW);
+  digitalWrite(mediumWaterLedPin, LOW);
+  digitalWrite(highWaterLedPin, LOW);
+
+  if (waterLevelPercent <= LOW_WATER_THRESHOLD) {
+    // Low water alert
+    digitalWrite(buzzerPin, HIGH); // Turn on buzzer
+    digitalWrite(lowWaterLedPin, HIGH); // Turn on low water LED (Red)
+    lcd.setCursor(10, 0);
+    lcd.print("LOW!  "); // Display alert on first row
+  } else if (waterLevelPercent >= HIGH_WATER_THRESHOLD) {
+    // High water alert
+    digitalWrite(buzzerPin, HIGH); // Turn on buzzer
+    digitalWrite(highWaterLedPin, HIGH); // Turn on high water LED (Green)
+    lcd.setCursor(10, 0);
+    lcd.print("HIGH! "); // Display alert on first row
+  } else if (waterLevelPercent >= MEDIUM_WATER_LOW_THRESHOLD && waterLevelPercent <= MEDIUM_WATER_HIGH_THRESHOLD) {
+    // Normal (Medium) water level
+    digitalWrite(mediumWaterLedPin, HIGH); // Turn on medium water LED (Yellow)
+    lcd.setCursor(10, 0);
+    lcd.print("GOOD  "); // Display normal status
+  } else {
+      // If none of the above, ensure buzzer and all LEDs are off.
+      digitalWrite(buzzerPin, LOW);
+      digitalWrite(lowWaterLedPin, LOW);
+      digitalWrite(mediumWaterLedPin, LOW);
+      digitalWrite(highWaterLedPin, LOW);
+      lcd.setCursor(10, 0);
+      lcd.print("OKAY  "); // Or clear the alert message
+  }
+
+  delay(1000); // Wait for 1 second before next reading
+}
